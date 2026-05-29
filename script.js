@@ -68,15 +68,31 @@ function renderTimetable(data) {
     const rows = data[1].row.sort((a, b) => a.PERIO - b.PERIO);
     
     rows.forEach(item => {
-        // 💡 [해결] 반 숫자가 나오는 문제를 막기 위해, 고등학교 시간표 데이터에서 
-        // 진짜 과목명이 들어있는 항목(ITM_NM)을 가장 확실한 방법으로 추출합니다.
-        let subjectName = item.ITM_NM;
-        
-        // 만약 ITM_NM이 비어있거나 숫자가 나오면 데이터 배열을 직접 뒤져서 과목명을 찾아냅니다.
-        if (!subjectName || !isNaN(subjectName)) {
+        // 💡 [해결] B10이나 숫자가 나오는 것을 원천 차단하기 위한 숭문고 전용 필터
+        let subjectName = "수업";
+
+        // 1. 나이스 API의 정식 과목명 필드(ITM_NM) 확인
+        if (item.ITM_NM && isNaN(item.ITM_NM) && item.ITM_NM !== "B10") {
+            subjectName = item.ITM_NM;
+        } else {
+            // 2. 만약 ITM_NM이 안 먹힌다면, 데이터 안에서 'B10', '7010156', '숭문고등학교', 숫자, 날짜를 전부 제외한 '진짜 과목 글자'만 추출
             const values = Object.values(item);
-            // 나이스 고등학교 시간표 데이터 구조상 과목명은 대개 뒤에서 2~3번째에 위치합니다.
-            subjectName = values.find(val => typeof val === 'string' && val.length >= 2 && isNaN(val) && val !== item.ATPT_OFCDC_SC_NM && val !== item.SCHUL_NM) || "수업";
+            const filtered = values.filter(val => {
+                const str = String(val).trim();
+                return typeof val === 'string' && 
+                       str.length >= 2 &&               // 두 글자 이상
+                       isNaN(str) &&                    // 숫자가 아닐 것
+                       !str.startsWith("2026") &&       // 날짜 제외
+                       str !== "B10" &&                 // 교육청 코드 제외
+                       str !== "서울특별시교육청" &&
+                       str !== "숭문고등학교" &&
+                       !str.includes("고등학교");        // 학교명 제외
+            });
+            
+            // 필터링을 거치고 남은 진짜 과목명 선택
+            if (filtered.length > 0) {
+                subjectName = filtered[filtered.length - 1]; // 보통 가장 뒤쪽에 과목명이 위치함
+            }
         }
         
         const tr = document.createElement("tr");
@@ -88,7 +104,6 @@ function renderTimetable(data) {
         tbody.appendChild(tr);
     });
 }
-
 function renderMeal(data) {
     const container = document.getElementById("meal-content");
     if (!data || !data[1] || !data[1].row) {
