@@ -64,13 +64,18 @@ function renderTimetable(data) {
         return;
     }
 
+    // 교시 순서대로 정렬
     const rows = data[1].row.sort((a, b) => a.PERIO - b.PERIO);
+    
     rows.forEach(item => {
+        // 💡 [수정] 나이스 API가 주는 과목명 변수 이름이 다를 수 있어서 여러 경우의 수를 다 체크함!
+        const subjectName = item.ITM_NM || item.CLASS_NM || item.ALL_TI_YMD || "수업"; 
+        
         const tr = document.createElement("tr");
         tr.className = "hover:bg-gray-50 transition";
         tr.innerHTML = `
             <td class="p-3 text-center font-bold text-indigo-500 bg-indigo-50/20">${item.PERIO}교시</td>
-            <td class="p-3 font-medium">${item.ITM_NM}</td>
+            <td class="p-3 font-medium">${subjectName}</td>
         `;
         tbody.appendChild(tr);
     });
