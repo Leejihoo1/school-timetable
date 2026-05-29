@@ -60,46 +60,21 @@ function renderTimetable(data) {
     tbody.innerHTML = "";
 
     if (!data || !data[1] || !data[1].row) {
-        tbody.innerHTML = `<tr><td colspan="2" class="p-8 text-center text-gray-400">오늘은 수업이 없거나 시간표 정보가 등록되지 않았습니다. (주말/휴일)</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="2" class="p-8 text-center text-gray-400">데이터가 없습니다.</td></tr>`;
         return;
     }
 
-    // 교시 순서대로 정렬
-    const rows = data[1].row.sort((a, b) => a.PERIO - b.PERIO);
-    
-    rows.forEach(item => {
-        // 💡 [해결] B10이나 숫자가 나오는 것을 원천 차단하기 위한 숭문고 전용 필터
-        let subjectName = "수업";
-
-        // 1. 나이스 API의 정식 과목명 필드(ITM_NM) 확인
-        if (item.ITM_NM && isNaN(item.ITM_NM) && item.ITM_NM !== "B10") {
-            subjectName = item.ITM_NM;
-        } else {
-            // 2. 만약 ITM_NM이 안 먹힌다면, 데이터 안에서 'B10', '7010156', '숭문고등학교', 숫자, 날짜를 전부 제외한 '진짜 과목 글자'만 추출
-            const values = Object.values(item);
-            const filtered = values.filter(val => {
-                const str = String(val).trim();
-                return typeof val === 'string' && 
-                       str.length >= 2 &&               // 두 글자 이상
-                       isNaN(str) &&                    // 숫자가 아닐 것
-                       !str.startsWith("2026") &&       // 날짜 제외
-                       str !== "B10" &&                 // 교육청 코드 제외
-                       str !== "서울특별시교육청" &&
-                       str !== "숭문고등학교" &&
-                       !str.includes("고등학교");        // 학교명 제외
-            });
-            
-            // 필터링을 거치고 남은 진짜 과목명 선택
-            if (filtered.length > 0) {
-                subjectName = filtered[filtered.length - 1]; // 보통 가장 뒤쪽에 과목명이 위치함
-            }
-        }
-        
+    // 💡 나이스 서버가 준 로우 데이터를 가공하지 않고 화면에 통째로 보여주기
+    data[1].row.forEach((item, index) => {
         const tr = document.createElement("tr");
-        tr.className = "hover:bg-gray-50 transition";
+        tr.className = "hover:bg-gray-50 transition text-xs";
+        
+        // 데이터 안에 들어있는 모든 글자들을 가로로 쭉 나열해서 보여줍니다.
+        const allValues = Object.entries(item).map(([key, val]) => `${key}:${val}`).join(" | ");
+        
         tr.innerHTML = `
-            <td class="p-3 text-center font-bold text-indigo-500 bg-indigo-50/20">${item.PERIO}교시</td>
-            <td class="p-3 font-medium">${subjectName}</td>
+            <td class="p-3 text-center font-bold text-indigo-500 bg-indigo-50/20">${item.PERIO || index+1}교시</td>
+            <td class="p-3 font-mono text-left">${allValues}</td>
         `;
         tbody.appendChild(tr);
     });
