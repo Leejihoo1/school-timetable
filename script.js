@@ -1,133 +1,97 @@
 const BASE_URL = "https://open.neis.go.kr/hub";
-const KEY = "772f7ed9093b4ffdbcd0f38b2d18449c"; // 안정적인 공용 키로 롤백 및 세팅 보완
+// ⚠️ 중요: 발급받은 네 진짜 인증키를 여기에 넣어줘! 급식 가져올 때 씁니다.
+const KEY = "802ac05b14724937ac1b903562a21903"; 
 
 const OFFICE_CODE = "B10";  // 서울시교육청
-const SCHOOL_CODE = "7010156"; // 숭문고등학교 코드
+const SCHOOL_CODE = "7010156"; // 숭문고 코드
 
-// 💡 [안전장치] 만약 나이스 API 서버가 먹통이거나 주말일 때 띄워줄 숭문고 1학년 시간표 대피소!
-const BACKUP_TIMETABLE = {
-    "월": ["국어", "수학", "영어", "과학", "사회", "체육", "음악"],
-    "화": ["영어", "국어", "미술", "미술", "수학", "한국사", "진로"],
-    "수": ["수학", "과학", "영어", "국어", "체육", "동아리", "동아리"],
-    "목": ["사회", "한국사", "과학", "수학", "영어", "국어", "지리"],
-    "금": ["한문", "영어", "수학", "과학", "체육", "자치", "종례"]
+// 🎯여기에 숭문고 1학년 진짜 요일별 시간표를 적어두면 끝!
+// 금요일은 네가 알려준 진짜 시간표로 완전히 고정했어! 나머지 요일도 알면 바꿔줘!
+const REAL_TIMETABLE = {
+    "월": ["공통국어1", "공통수학1", "공통영어1", "통합과학1", "통합사회1", "체육1", "음악"],
+    "화": ["공통영어1", "공통국어1", "미술", "미술", "공통수학1", "한국사1", "진로"],
+    "수": ["공통수학1", "통합과학1", "공통영어1", "공통국어1", "체육1", "과학탐구실험1", "정보"],
+    "목": ["통합사회1", "한국사1", "통합과학1", "공통수학1", "공통영어1", "공통국어1", "기술가정"],
+    "금": ["정보", "공통수학1", "한국사1", "공통영어1", "공통국어1", "동아리활동", "동아리활동"]
 };
 
-const BACKUP_MEAL = "🍱 오늘의 추천 급식 메뉴\n\n나물비빔밥 / 계란후라이\n두부장국\n청포묵김가루무침\n콘치즈마요토스트\n배추김치 / 방울토마토";
-
-// 날짜 계산 함수
-function getTargetDate() {
+// 주말이거나 밤늦게 접속했을 때 언제나 '가장 가까운 평일' 날짜와 요일을 계산하는 함수
+function getTodayInfo() {
     const today = new Date();
-    if (today.getHours() >= 20) {
+    let day = today.getDay(); // 0:일, 1:월, ..., 5:금, 6:토
+
+    // 금요일 밤 8시 이후이거나 토요일, 일요일이면 무조건 '월요일' 급식과 시간표를 타겟팅
+    if ((day === 5 && today.getHours() >= 20) || day === 6 || day === 0) {
+        if (day === 5) today.setDate(today.getDate() + 3);
+        else if (day === 6) today.setDate(today.getDate() + 2);
+        else if (day === 0) today.setDate(today.getDate() + 1);
+        day = 1; // 월요일로 고정
+    } 
+    // 평일(월~목) 밤 8시 이후라면 '내일' 시간표와 급식을 미리 보여줌
+    else if (today.getHours() >= 20) {
         today.setDate(today.getDate() + 1);
+        day = today.getDay();
     }
-    const day = today.getDay();
-    if (day === 6) today.setDate(today.getDate() + 2);
-    else if (day === 0) today.setDate(today.getDate() + 1);
 
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
-    return `${yyyy}${mm}${dd}`;
-}
-
-function displayDate(dateStr) {
-    const yyyy = dateStr.substring(0, 4);
-    const mm = dateStr.substring(4, 6);
-    const dd = dateStr.substring(6, 8);
-    const targetDate = new Date(`${yyyy}-${mm}-${dd}`);
-    const week = ["일", "월", "화", "수", "목", "금", "토"];
-    const dayName = week[targetDate.getDay()];
-    document.getElementById("current-date-text").innerText = `📅 ${yyyy}년 ${mm}월 ${dd}일 (${dayName}요일) 기준`;
-    return dayName;
-}
-
-// 메인 실행 함수
-async function loadDefaultData() {
-    const targetDate = getTargetDate(); 
-    const dayName = displayDate(targetDate);
     
-    const grade = document.getElementById("grade").value;
-    const classNm = document.getElementById("classNm").value;
+    const week = ["일", "월", "화", "수", "목", "금", "토"];
+    const dayName = week[day];
 
+    return { ymd: `${yyyy}${mm}${dd}`, yyyy, mm, dd, dayName };
+}
+
+// 화면 상단 날짜 표시
+function displayDate(info) {
+    document.getElementById("current-date-text").innerText = `📅 ${info.yyyy}년 ${info.mm}월 ${info.dd}일 (${info.dayName}요일) 기준`;
+}
+
+// 웹사이트가 켜지면 실행되는 함수
+async function loadDefaultData() {
+    const info = getTodayInfo(); // 계산된 날짜 정보
+    displayDate(info);
+    
+    // 1. 우리가 직접 입력한 진짜 숭문고 시간표 출력
+    renderRealTimetable(info.dayName);
+
+    // 2. 급식은 나이스에서 실시간으로 안전하게 긁어오기
     try {
-        // 주소창 뒤에 pIndex와 pSize를 필수로 붙여야 데이터를 뱉는 나이스 서버의 규칙 반영
-        const [timeRes, mealRes] = await Promise.all([
-            fetch(`${BASE_URL}/hisTimetable?KEY=${KEY}&Type=json&pIndex=1&pSize=10&ATPT_OFCDC_SC_CODE=${OFFICE_CODE}&SD_SCHUL_CODE=${SCHOOL_CODE}&ALL_TI_YMD=${targetDate}&GRADE=${grade}&CLASS_NM=${classNm}`),
-            fetch(`${BASE_URL}/mealServiceDietInfo?KEY=${KEY}&Type=json&pIndex=1&pSize=10&ATPT_OFCDC_SC_CODE=${OFFICE_CODE}&SD_SCHUL_CODE=${SCHOOL_CODE}&MLSV_YMD=${targetDate}`)
-        ]);
-
-        const timeData = await timeRes.json();
+        const mealRes = await fetch(`${BASE_URL}/mealServiceDietInfo?KEY=${KEY}&Type=json&pIndex=1&pSize=10&ATPT_OFCDC_SC_CODE=${OFFICE_CODE}&SD_SCHUL_CODE=${SCHOOL_CODE}&MLSV_YMD=${info.ymd}`);
         const mealData = await mealRes.json();
-
-        // 데이터가 정상적으로 들어왔는지 꼼꼼하게 검사
-        if (timeData.hisTimetable && timeData.hisTimetable[1] && timeData.hisTimetable[1].row) {
-            renderTimetable(timeData.hisTimetable[1].row);
-        } else {
-            // 나이스 서버가 팅기면 즉시 백업 시간표 가동!
-            renderBackupTimetable(dayName);
-        }
-
-        if (mealData.mealServiceDietInfo && mealData.mealServiceDietInfo[1] && mealData.mealServiceDietInfo[1].row) {
-            renderMeal(mealData.mealServiceDietInfo[1].row);
-        } else {
-            // 급식 백업 가동
-            document.getElementById("meal-content").innerText = BACKUP_MEAL;
-        }
-
+        renderMeal(mealData.mealServiceDietInfo);
     } catch (error) {
         console.error(error);
-        renderBackupTimetable(dayName);
-        document.getElementById("meal-content").innerText = BACKUP_MEAL;
+        document.getElementById("meal-content").innerHTML = `<p class="text-gray-400">급식 정보를 가져오지 못했습니다.</p>`;
     }
 }
 
-// 실시간 API 데이터 파싱 및 화면 출력
-function renderTimetable(rows) {
+// 요일에 맞춰 진짜 시간표를 그려주는 함수
+function renderRealTimetable(dayName) {
     const tbody = document.getElementById("timetable-body");
     tbody.innerHTML = "";
-    
-    const sungmoonRows = rows.filter(item => item.SD_SCHUL_CODE === SCHOOL_CODE).sort((a, b) => a.PERIO - b.PERIO);
-    
-    if (sungmoonRows.length === 0) {
-        renderBackupTimetable(displayDate(getTargetDate()));
-        return;
-    }
 
-    sungmoonRows.forEach(item => {
-        const subjectName = item.ITRT_CNTNT || "수업"; 
-        const tr = document.createElement("tr");
-        tr.className = "hover:bg-gray-50 transition";
-        tr.innerHTML = `
-            <td class="p-3 text-center font-bold text-indigo-500 bg-indigo-50/20">${item.PERIO}교시</td>
-            <td class="p-3 font-medium">${subjectName}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
-
-// 백업 시스템용 출격 함수
-function renderBackupTimetable(dayName) {
-    const tbody = document.getElementById("timetable-body");
-    tbody.innerHTML = "";
-    
-    const dayKey = (dayName === "토" || dayName === "일") ? "월" : dayName;
-    const subjects = BACKUP_TIMETABLE[dayKey] || BACKUP_TIMETABLE["월"];
+    const subjects = REAL_TIMETABLE[dayName] || REAL_TIMETABLE["월"];
 
     subjects.forEach((subject, index) => {
         const tr = document.createElement("tr");
         tr.className = "hover:bg-gray-50 transition";
         tr.innerHTML = `
             <td class="p-3 text-center font-bold text-indigo-500 bg-indigo-50/20">${index + 1}교시</td>
-            <td class="p-3 font-medium">${subject} (기본)</td>
+            <td class="p-3 font-medium">${subject}</td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-function renderMeal(row) {
+function renderMeal(data) {
     const container = document.getElementById("meal-content");
-    let mealString = row[0].DDISH_NM.replace(/<br\/>/g, "\n").replace(/\([0-9.]+\)/g, "");
+    if (!data || !data[1] || !data[1].row) {
+        container.innerHTML = `<p class="text-gray-400">해당 날짜에는 급식 정보가 없습니다.</p>`;
+        return;
+    }
+    let mealString = data[1].row[0].DDISH_NM.replace(/<br\/>/g, "\n").replace(/\([0-9.]+\)/g, "");
     container.className = "bg-orange-50/50 p-6 rounded-xl border border-orange-100 text-gray-700 text-left leading-relaxed font-medium whitespace-pre-line";
     container.innerText = mealString;
 }
