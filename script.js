@@ -1,7 +1,7 @@
 const BASE_URL = "https://open.neis.go.kr/hub";
 
 // ⚠️ 중요: 여기에 방금 발급받은 네 진짜 인증키를 복사해서 붙여넣어줘!
-const KEY = "여기에_발급받은_인증키를_넣으세요"; 
+const KEY = "802ac05b14724937ac1b903562a21903"; 
 
 const OFFICE_CODE = "B10";  // 서울시교육청
 const SCHOOL_CODE = "7010156"; // 숭문고 코드
