@@ -68,8 +68,16 @@ function renderTimetable(data) {
     const rows = data[1].row.sort((a, b) => a.PERIO - b.PERIO);
     
     rows.forEach(item => {
-        // 💡 [수정] 나이스 API가 주는 과목명 변수 이름이 다를 수 있어서 여러 경우의 수를 다 체크함!
-        const subjectName = item.ITM_NM || item.CLASS_NM || item.ALL_TI_YMD || "수업"; 
+        // 💡 [해결] 반 숫자가 나오는 문제를 막기 위해, 고등학교 시간표 데이터에서 
+        // 진짜 과목명이 들어있는 항목(ITM_NM)을 가장 확실한 방법으로 추출합니다.
+        let subjectName = item.ITM_NM;
+        
+        // 만약 ITM_NM이 비어있거나 숫자가 나오면 데이터 배열을 직접 뒤져서 과목명을 찾아냅니다.
+        if (!subjectName || !isNaN(subjectName)) {
+            const values = Object.values(item);
+            // 나이스 고등학교 시간표 데이터 구조상 과목명은 대개 뒤에서 2~3번째에 위치합니다.
+            subjectName = values.find(val => typeof val === 'string' && val.length >= 2 && isNaN(val) && val !== item.ATPT_OFCDC_SC_NM && val !== item.SCHUL_NM) || "수업";
+        }
         
         const tr = document.createElement("tr");
         tr.className = "hover:bg-gray-50 transition";
